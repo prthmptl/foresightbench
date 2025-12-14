@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Iterator, Any
 
-from ..evaluation.metrics import TaskMetrics, GlobalMetrics
+from evaluation.metrics import TaskMetrics, GlobalMetrics
 
 
 @dataclass

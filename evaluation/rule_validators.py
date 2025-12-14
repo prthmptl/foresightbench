@@ -12,8 +12,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 from enum import Enum
 
-from ..core.capture import PlanCapture, ExecutionCapture, align_plan_and_execution
-
+from core.capture import PlanCapture, ExecutionCapture, align_plan_and_execution
 
 class ValidationSeverity(str, Enum):
     """Severity level of validation issues."""

@@ -13,8 +13,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 from enum import Enum
 
-from ..core.capture import PlanStep, ExecutionStep, PlanCapture, ExecutionCapture, align_plan_and_execution
-from ..core.llm_interface import LLMClient, GenerationConfig
+from core.capture import PlanStep, ExecutionStep, PlanCapture, ExecutionCapture, align_plan_and_execution
+from core.llm_interface import LLMClient, GenerationConfig
 
 
 class EvaluationMethod(str, Enum):
