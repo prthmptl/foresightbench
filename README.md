@@ -230,7 +230,7 @@ MIT License
 ```bibtex
 @software{foresightbench2024,
   title = {ForesightBench: Evaluating LLM Plan-Execution Faithfulness},
-  year = {2024},
-  url = {https://github.com/your-org/foresight-bench}
+  year = {2025},
+  url = {https://github.com/prthmptl/foresight-bench}
 }
 ```
