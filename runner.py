@@ -188,7 +188,7 @@ class ForesightBenchRunner:
             self._log(f"  Semantic score: {semantic_result.overall_score:.3f}")
         else:
             # Create a minimal semantic result for metrics computation
-            from .evaluation.semantic_evaluator import SemanticEvaluationResult, StepEvaluation, EvaluationMethod
+            from evaluation.semantic_evaluator import SemanticEvaluationResult, StepEvaluation, EvaluationMethod
             step_evals = [
                 StepEvaluation(
                     step_index=i + 1,
@@ -391,7 +391,7 @@ def run_quick_benchmark(
     Returns:
         BenchmarkResult
     """
-    from .core.llm_interface import create_client
+    from core.llm_interface import create_client
     
     client = create_client(provider, model, api_key)
     

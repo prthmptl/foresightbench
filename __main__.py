@@ -12,13 +12,17 @@ import argparse
 import sys
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def cmd_run(args):
     """Run benchmark on a single model."""
-    from .core.llm_interface import create_client
-    from .runner import ForesightBenchRunner, RunConfig
-    from .storage.experiment_tracker import ExperimentTracker
+    from core.llm_interface import create_client
+    from runner import ForesightBenchRunner, RunConfig
+    from storage.experiment_tracker import ExperimentTracker
 
     # Create client
     client = create_client(
@@ -58,8 +62,8 @@ def cmd_run(args):
 
 def cmd_compare(args):
     """Run comparison across multiple models."""
-    from .core.llm_interface import create_client
-    from .runner import ForesightBenchRunner, RunConfig
+    from core.llm_interface import create_client
+    from runner import ForesightBenchRunner, RunConfig
 
     # Parse models
     model_specs = args.models.split(",")
@@ -111,8 +115,8 @@ def cmd_compare(args):
 
 def cmd_report(args):
     """Generate report from experiment data."""
-    from .storage.experiment_tracker import ExperimentTracker, TraceViewer
-    from .evaluation.metrics import format_metrics_report
+    from storage.experiment_tracker import ExperimentTracker, TraceViewer
+    from evaluation.metrics import format_metrics_report
 
     tracker = ExperimentTracker(
         storage_dir=args.output_dir,
@@ -146,8 +150,8 @@ def cmd_report(args):
 
 def cmd_demo(args):
     """Run a quick demo with mock model."""
-    from .runner import run_quick_benchmark
-    from .evaluation.metrics import format_metrics_report
+    from runner import run_quick_benchmark
+    from evaluation.metrics import format_metrics_report
 
     print("Running ForesightBench demo with mock model...\n")
 
