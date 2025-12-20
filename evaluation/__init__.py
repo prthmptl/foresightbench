@@ -11,6 +11,8 @@ from .config import (
     DriftConfig,
     PassThresholds,
     StepBounds,
+    AlignmentConfig,
+    DecomposedEvalConfig,
     DEFAULT_CONFIG,
     load_config_from_dict,
 )
@@ -27,6 +29,14 @@ from .semantic_evaluator import (
     StepEvaluation,
     EvaluationMethod,
     calculate_drift,
+)
+from .alignment import (
+    SemanticAligner,
+    AlignmentResult,
+    StepAlignment,
+    AlignmentType,
+    EmbeddingClient,
+    align_with_fallback,
 )
 from .metrics import (
     MetricsComputer,
@@ -49,6 +59,8 @@ __all__ = [
     "DriftConfig",
     "PassThresholds",
     "StepBounds",
+    "AlignmentConfig",
+    "DecomposedEvalConfig",
     "DEFAULT_CONFIG",
     "load_config_from_dict",
     # Rule validation
@@ -63,6 +75,13 @@ __all__ = [
     "StepEvaluation",
     "EvaluationMethod",
     "calculate_drift",
+    # Alignment
+    "SemanticAligner",
+    "AlignmentResult",
+    "StepAlignment",
+    "AlignmentType",
+    "EmbeddingClient",
+    "align_with_fallback",
     # Metrics
     "MetricsComputer",
     "StepMetrics",

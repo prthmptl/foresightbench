@@ -72,6 +72,10 @@ def cmd_compare(args):
     for spec in model_specs:
         if ":" in spec:
             provider, model = spec.split(":", 1)
+        elif args.provider:
+            # Use explicitly specified provider
+            provider = args.provider
+            model = spec
         else:
             # Auto-detect provider
             if "gpt" in spec.lower():
@@ -184,9 +188,9 @@ def main():
     # Run command
     run_parser = subparsers.add_parser("run", help="Run benchmark on a model")
     run_parser.add_argument("--model", "-m", required=True, help="Model name")
-    run_parser.add_argument("--provider", "-p", default="openai",
-                           choices=["openai", "anthropic", "openrouter", "groq", "mock"],
-                           help="Model provider")
+    run_parser.add_argument("--provider", "-p", default="openai", 
+                            choices=["openai", "anthropic", "openrouter", "groq", "mock"], 
+                            help="Model provider")
     run_parser.add_argument("--api-key", help="API key (or use env var)")
     run_parser.add_argument("--max-tasks", type=int, default=10, help="Max tasks to run")
     run_parser.add_argument("--num-runs", type=int, default=1, help="Runs per task")
@@ -198,8 +202,11 @@ def main():
 
     # Compare command
     compare_parser = subparsers.add_parser("compare", help="Compare multiple models")
-    compare_parser.add_argument("--models", "-m", required=True, 
+    compare_parser.add_argument("--models", "-m", required=True,
                                help="Models to compare (comma-separated, e.g., 'gpt-4,claude-3-opus')")
+    compare_parser.add_argument("--provider", "-p", default=None,
+                               choices=["openai", "anthropic", "openrouter", "groq", "mock"],
+                               help="Model provider (overrides auto-detection)")
     compare_parser.add_argument("--max-tasks", type=int, default=10, help="Max tasks per model")
     compare_parser.add_argument("--temperature", type=float, default=0.0)
     compare_parser.add_argument("--semantic-eval", action="store_true")

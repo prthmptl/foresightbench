@@ -59,5 +59,23 @@
     "max_steps": 20
   },
 
+  "alignment": {
+    "_comment": "Semantic alignment configuration",
+    "similarity_threshold": 0.5,
+    "merge_detection": true,
+    "split_detection": true,
+    "use_semantic": true,
+    "embedding_model": "text-embedding-3-small"
+  },
+
+  "decomposed_eval": {
+    "_comment": "Decomposed (Q&A-based) evaluation configuration",
+    "use_decomposed": true,
+    "intent_weight": 0.5,
+    "quality_weight": 0.5,
+    "merge_purity_penalty": 0.7,
+    "extra_step_score": 0.25
+  },
+
   "late_step_bonus": 0.0
 }

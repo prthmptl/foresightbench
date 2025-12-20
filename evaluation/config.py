@@ -182,6 +182,30 @@ class StepBounds:
 
 
 @dataclass
+class AlignmentConfig:
+    """
+    Configuration for semantic step alignment.
+    """
+    similarity_threshold: float = 0.5   # Minimum similarity for alignment
+    merge_detection: bool = True        # Detect merged steps
+    split_detection: bool = True        # Detect split steps
+    use_semantic: bool = True           # Use semantic vs index-based alignment
+    embedding_model: str = "text-embedding-3-small"  # Model for embeddings
+
+
+@dataclass
+class DecomposedEvalConfig:
+    """
+    Configuration for decomposed (Q&A-based) evaluation.
+    """
+    use_decomposed: bool = True         # Use decomposed prompts vs single-score
+    intent_weight: float = 0.5          # Weight for intent in step_match
+    quality_weight: float = 0.5         # Weight for quality in step_match
+    merge_purity_penalty: float = 0.7   # Purity score for merged steps
+    extra_step_score: float = 0.25      # Default score for extra steps
+
+
+@dataclass
 class EvaluationConfig:
     """
     Master configuration for the entire evaluation system.
@@ -214,6 +238,10 @@ class EvaluationConfig:
     pass_thresholds: PassThresholds = field(default_factory=PassThresholds)
     step_bounds: StepBounds = field(default_factory=StepBounds)
 
+    # New alignment and decomposed evaluation configs
+    alignment: AlignmentConfig = field(default_factory=AlignmentConfig)
+    decomposed_eval: DecomposedEvalConfig = field(default_factory=DecomposedEvalConfig)
+
     # Additional settings
     late_step_bonus: float = 0.0        # Extra weight for later steps (0 = disabled)
 
@@ -235,7 +263,7 @@ Semantic Weights (must sum to 1.0):
   - Constraint fidelity: {self.semantic_weights.constraint_fidelity}
   - Step purity: {self.semantic_weights.step_purity}
 
-Foresight Score = {self.foresight_weights.rule_validation} × rule + {self.foresight_weights.semantic_evaluation} × semantic
+Foresight Score = {self.foresight_weights.rule_validation} x rule + {self.foresight_weights.semantic_evaluation} x semantic
 
 Pass Thresholds:
   - Rule validation: {self.pass_thresholds.rule_validation}
@@ -243,8 +271,19 @@ Pass Thresholds:
   - Foresight score: {self.pass_thresholds.foresight_score}
 
 Drift Detection:
-  - Threshold: ±{self.drift.threshold}
+  - Threshold: +/-{self.drift.threshold}
   - Rolling window: {self.drift.rolling_window_size} steps
+
+Alignment:
+  - Use semantic: {self.alignment.use_semantic}
+  - Similarity threshold: {self.alignment.similarity_threshold}
+  - Merge detection: {self.alignment.merge_detection}
+  - Split detection: {self.alignment.split_detection}
+
+Decomposed Evaluation:
+  - Use decomposed: {self.decomposed_eval.use_decomposed}
+  - Intent weight: {self.decomposed_eval.intent_weight}
+  - Quality weight: {self.decomposed_eval.quality_weight}
 
 Step Bounds: {self.step_bounds.min_steps} - {self.step_bounds.max_steps}
 """
@@ -252,6 +291,11 @@ Step Bounds: {self.step_bounds.min_steps} - {self.step_bounds.max_steps}
 
 # Default configuration instance
 DEFAULT_CONFIG = EvaluationConfig()
+
+
+def _filter_comments(d: dict) -> dict:
+    """Remove _comment keys from a dictionary."""
+    return {k: v for k, v in d.items() if not k.startswith("_")}
 
 
 def load_config_from_dict(data: dict) -> EvaluationConfig:
@@ -267,23 +311,27 @@ def load_config_from_dict(data: dict) -> EvaluationConfig:
     config = EvaluationConfig()
 
     if "penalties" in data:
-        config.penalties = PenaltyConfig(**data["penalties"])
+        config.penalties = PenaltyConfig(**_filter_comments(data["penalties"]))
     if "semantic_weights" in data:
-        config.semantic_weights = SemanticWeights(**data["semantic_weights"])
+        config.semantic_weights = SemanticWeights(**_filter_comments(data["semantic_weights"]))
     if "foresight_weights" in data:
-        config.foresight_weights = ForesightScoreWeights(**data["foresight_weights"])
+        config.foresight_weights = ForesightScoreWeights(**_filter_comments(data["foresight_weights"]))
     if "reliability_weights" in data:
-        config.reliability_weights = ReliabilityWeights(**data["reliability_weights"])
+        config.reliability_weights = ReliabilityWeights(**_filter_comments(data["reliability_weights"]))
     if "planning_weights" in data:
-        config.planning_weights = PlanningQualityWeights(**data["planning_weights"])
+        config.planning_weights = PlanningQualityWeights(**_filter_comments(data["planning_weights"]))
     if "completeness_heuristic" in data:
-        config.completeness_heuristic = CompletenessHeuristic(**data["completeness_heuristic"])
+        config.completeness_heuristic = CompletenessHeuristic(**_filter_comments(data["completeness_heuristic"]))
     if "drift" in data:
-        config.drift = DriftConfig(**data["drift"])
+        config.drift = DriftConfig(**_filter_comments(data["drift"]))
     if "pass_thresholds" in data:
-        config.pass_thresholds = PassThresholds(**data["pass_thresholds"])
+        config.pass_thresholds = PassThresholds(**_filter_comments(data["pass_thresholds"]))
     if "step_bounds" in data:
-        config.step_bounds = StepBounds(**data["step_bounds"])
+        config.step_bounds = StepBounds(**_filter_comments(data["step_bounds"]))
+    if "alignment" in data:
+        config.alignment = AlignmentConfig(**_filter_comments(data["alignment"]))
+    if "decomposed_eval" in data:
+        config.decomposed_eval = DecomposedEvalConfig(**_filter_comments(data["decomposed_eval"]))
     if "late_step_bonus" in data:
         config.late_step_bonus = data["late_step_bonus"]
 
