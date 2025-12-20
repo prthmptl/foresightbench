@@ -242,6 +242,160 @@ class AnthropicClient(LLMClient):
         )
 
 
+class OpenRouterClient(LLMClient):
+    """
+    OpenRouter API client.
+
+    OpenRouter provides access to multiple LLM providers through a unified API.
+    Supports models from OpenAI, Anthropic, Google, Meta, and others.
+    """
+
+    def __init__(
+        self,
+        model: str = "openai/gpt-4",
+        api_key: Optional[str] = None,
+        config: Optional[GenerationConfig] = None,
+    ):
+        super().__init__(model, config)
+        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
+        self._client = None
+
+    def _get_client(self):
+        """Lazy initialization of OpenRouter client (uses OpenAI SDK)."""
+        if self._client is None:
+            try:
+                from openai import OpenAI
+                self._client = OpenAI(
+                    api_key=self.api_key,
+                    base_url="https://openrouter.ai/api/v1",
+                )
+            except ImportError:
+                raise ImportError("openai package not installed. Run: pip install openai")
+        return self._client
+
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        config: Optional[GenerationConfig] = None,
+    ) -> GenerationResult:
+        """Generate using OpenRouter API."""
+        config = config or self.default_config
+        client = self._get_client()
+
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        start_time = time.time()
+
+        kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": config.temperature,
+            "max_tokens": config.max_tokens,
+            "top_p": config.top_p,
+        }
+
+        if config.stop_sequences:
+            kwargs["stop"] = config.stop_sequences
+        if config.seed is not None:
+            kwargs["seed"] = config.seed
+
+        response = client.chat.completions.create(**kwargs)
+
+        latency_ms = (time.time() - start_time) * 1000
+
+        return GenerationResult(
+            text=response.choices[0].message.content or "",
+            model=self.model,
+            prompt_tokens=response.usage.prompt_tokens if response.usage else 0,
+            completion_tokens=response.usage.completion_tokens if response.usage else 0,
+            total_tokens=response.usage.total_tokens if response.usage else 0,
+            latency_ms=latency_ms,
+            metadata={
+                "finish_reason": response.choices[0].finish_reason,
+                "provider": "openrouter",
+            },
+        )
+
+
+class GroqClient(LLMClient):
+    """
+    Groq API client.
+
+    Groq provides fast inference for open-source models like Llama, Mixtral, etc.
+    """
+
+    def __init__(
+        self,
+        model: str = "llama-3.3-70b-versatile",
+        api_key: Optional[str] = None,
+        config: Optional[GenerationConfig] = None,
+    ):
+        super().__init__(model, config)
+        self.api_key = api_key or os.environ.get("GROQ_API_KEY")
+        self._client = None
+
+    def _get_client(self):
+        """Lazy initialization of Groq client."""
+        if self._client is None:
+            try:
+                from groq import Groq
+                self._client = Groq(api_key=self.api_key)
+            except ImportError:
+                raise ImportError("groq package not installed. Run: pip install groq")
+        return self._client
+
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        config: Optional[GenerationConfig] = None,
+    ) -> GenerationResult:
+        """Generate using Groq API."""
+        config = config or self.default_config
+        client = self._get_client()
+
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        start_time = time.time()
+
+        kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": config.temperature,
+            "max_tokens": config.max_tokens,
+            "top_p": config.top_p,
+        }
+
+        if config.stop_sequences:
+            kwargs["stop"] = config.stop_sequences
+        if config.seed is not None:
+            kwargs["seed"] = config.seed
+
+        response = client.chat.completions.create(**kwargs)
+
+        latency_ms = (time.time() - start_time) * 1000
+
+        return GenerationResult(
+            text=response.choices[0].message.content or "",
+            model=self.model,
+            prompt_tokens=response.usage.prompt_tokens if response.usage else 0,
+            completion_tokens=response.usage.completion_tokens if response.usage else 0,
+            total_tokens=response.usage.total_tokens if response.usage else 0,
+            latency_ms=latency_ms,
+            metadata={
+                "finish_reason": response.choices[0].finish_reason,
+                "provider": "groq",
+            },
+        )
+
+
 class MockLLMClient(LLMClient):
     """
     Mock client for testing without API calls.
@@ -344,13 +498,13 @@ def create_client(
 ) -> LLMClient:
     """
     Factory function to create an LLM client.
-    
+
     Args:
-        provider: One of "openai", "anthropic", "mock"
+        provider: One of "openai", "anthropic", "openrouter", "groq", "mock"
         model: Model name (uses default for provider if not specified)
         api_key: API key (uses environment variable if not specified)
         config: Generation configuration
-        
+
     Returns:
         Configured LLMClient instance
     """
@@ -365,6 +519,18 @@ def create_client(
     elif provider == "anthropic":
         return AnthropicClient(
             model=model or "claude-3-opus-20240229",
+            api_key=api_key,
+            config=config,
+        )
+    elif provider == "openrouter":
+        return OpenRouterClient(
+            model=model or "openai/gpt-4",
+            api_key=api_key,
+            config=config,
+        )
+    elif provider == "groq":
+        return GroqClient(
+            model=model or "llama-3.3-70b-versatile",
             api_key=api_key,
             config=config,
         )

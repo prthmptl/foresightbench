@@ -9,11 +9,14 @@ Computes:
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import statistics
 
 from .rule_validators import ValidationResult
 from .semantic_evaluator import SemanticEvaluationResult, StepEvaluation, calculate_drift
+
+if TYPE_CHECKING:
+    from .config import EvaluationConfig
 
 
 @dataclass
@@ -110,23 +113,34 @@ class MetricsComputer:
         step_weights: Optional[dict[str, float]] = None,
         late_step_bonus: float = 0.0,  # Extra weight for later steps
         pass_threshold: float = 0.7,
+        config: Optional["EvaluationConfig"] = None,
     ):
         """
         Initialize metrics computer.
-        
+
         Args:
-            step_weights: Weights for combining step metrics
-            late_step_bonus: Additional weight per step index for later steps
-            pass_threshold: Threshold for "passing" a task
+            step_weights: Weights for combining step metrics - DEPRECATED, use config
+            late_step_bonus: Additional weight per step index for later steps - DEPRECATED, use config
+            pass_threshold: Threshold for "passing" a task - DEPRECATED, use config
+            config: EvaluationConfig for centralized configuration
         """
-        self.step_weights = step_weights or {
-            "step_match": 0.4,
-            "completeness": 0.3,
-            "constraint_fidelity": 0.2,
-            "step_purity": 0.1,
-        }
-        self.late_step_bonus = late_step_bonus
-        self.pass_threshold = pass_threshold
+        self.config = config
+
+        if config is not None:
+            # Use config if provided
+            self.step_weights = config.semantic_weights.to_dict()
+            self.late_step_bonus = config.late_step_bonus
+            self.pass_threshold = config.pass_thresholds.semantic_evaluation
+        else:
+            # Legacy behavior
+            self.step_weights = step_weights or {
+                "step_match": 0.4,
+                "completeness": 0.3,
+                "constraint_fidelity": 0.2,
+                "step_purity": 0.1,
+            }
+            self.late_step_bonus = late_step_bonus
+            self.pass_threshold = pass_threshold
 
     def compute_step_metrics(
         self,
@@ -219,25 +233,53 @@ class MetricsComputer:
         skipped_rate = skipped / plan_step_count if plan_step_count > 0 else 0.0
         extra_rate = extra / plan_step_count if plan_step_count > 0 else 0.0
 
-        # Drift analysis
-        drift_info = calculate_drift(semantic_result.degradation_curve)
+        # Drift analysis - use config if available
+        if self.config is not None:
+            drift_info = calculate_drift(
+                semantic_result.degradation_curve,
+                drift_threshold=self.config.drift.threshold,
+                rolling_window_size=self.config.drift.rolling_window_size,
+            )
+        else:
+            drift_info = calculate_drift(semantic_result.degradation_curve)
 
-        # Core scores
-        foresight_score = (
-            rule_result.score * 0.3 +
-            semantic_result.overall_score * 0.7
-        )
+        # Core scores - use config weights if available
+        if self.config is not None:
+            fw = self.config.foresight_weights
+            foresight_score = (
+                rule_result.score * fw.rule_validation +
+                semantic_result.overall_score * fw.semantic_evaluation
+            )
 
-        execution_reliability = (
-            (1.0 - skipped_rate) * 0.5 +
-            semantic_result.average_step_match * 0.3 +
-            rule_result.score * 0.2
-        )
+            rw = self.config.reliability_weights
+            execution_reliability = (
+                (1.0 - skipped_rate) * rw.skip_avoidance +
+                semantic_result.average_step_match * rw.step_match +
+                rule_result.score * rw.rule_compliance
+            )
 
-        planning_quality = (
-            semantic_result.average_completeness * 0.5 +
-            rule_result.score * 0.5
-        )
+            pw = self.config.planning_weights
+            planning_quality = (
+                semantic_result.average_completeness * pw.completeness +
+                rule_result.score * pw.rule_compliance
+            )
+        else:
+            # Legacy hardcoded weights
+            foresight_score = (
+                rule_result.score * 0.3 +
+                semantic_result.overall_score * 0.7
+            )
+
+            execution_reliability = (
+                (1.0 - skipped_rate) * 0.5 +
+                semantic_result.average_step_match * 0.3 +
+                rule_result.score * 0.2
+            )
+
+            planning_quality = (
+                semantic_result.average_completeness * 0.5 +
+                rule_result.score * 0.5
+            )
 
         return TaskMetrics(
             task_id=task_id,
@@ -312,8 +354,9 @@ class MetricsComputer:
         std_foresight = statistics.stdev(foresight_scores) if len(foresight_scores) > 1 else 0.0
         median_foresight = statistics.median(foresight_scores)
 
-        # Pass rates
-        rule_passes = sum(1 for t in task_metrics if t.rule_validation_score >= 0.5)
+        # Pass rates - use config thresholds if available
+        rule_threshold = self.config.pass_thresholds.rule_validation if self.config else 0.5
+        rule_passes = sum(1 for t in task_metrics if t.rule_validation_score >= rule_threshold)
         semantic_passes = sum(1 for t in task_metrics if t.semantic_evaluation_score >= self.pass_threshold)
 
         # Drift

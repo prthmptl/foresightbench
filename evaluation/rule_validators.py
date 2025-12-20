@@ -9,10 +9,13 @@ These run BEFORE semantic judging to catch structural issues:
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from enum import Enum
 
 from core.capture import PlanCapture, ExecutionCapture, align_plan_and_execution
+
+if TYPE_CHECKING:
+    from .config import EvaluationConfig
 
 class ValidationSeverity(str, Enum):
     """Severity level of validation issues."""
@@ -53,12 +56,12 @@ class ValidationResult:
 class RuleValidator:
     """
     Performs rule-based validation on plans and executions.
-    
+
     This validator runs fast, deterministic checks that don't require
     semantic understanding.
     """
 
-    # Penalty weights for different issues
+    # Penalty weights for different issues (legacy - use EvaluationConfig instead)
     DEFAULT_PENALTIES = {
         "step_count_mismatch": 0.1,  # Per step difference
         "skipped_step": 0.15,        # Per skipped step
@@ -68,29 +71,51 @@ class RuleValidator:
         "parse_failure": 0.5,        # If parsing completely failed
     }
 
-    def __init__(self, penalties: Optional[dict[str, float]] = None):
+    def __init__(
+        self,
+        penalties: Optional[dict[str, float]] = None,
+        config: Optional["EvaluationConfig"] = None,
+    ):
         """
         Initialize validator.
-        
-        Args:
-            penalties: Custom penalty weights (overrides defaults)
-        """
-        self.penalties = {**self.DEFAULT_PENALTIES}
-        if penalties:
-            self.penalties.update(penalties)
 
-    def validate_plan(self, plan: PlanCapture, min_steps: int = 1, max_steps: int = 20) -> ValidationResult:
+        Args:
+            penalties: Custom penalty weights (overrides defaults) - DEPRECATED, use config
+            config: EvaluationConfig instance for centralized configuration
+        """
+        if config is not None:
+            # Use config if provided
+            self.penalties = config.penalties.to_dict()
+            self.config = config
+        else:
+            # Legacy behavior: use DEFAULT_PENALTIES with optional overrides
+            self.penalties = {**self.DEFAULT_PENALTIES}
+            if penalties:
+                self.penalties.update(penalties)
+            self.config = None
+
+    def validate_plan(
+        self,
+        plan: PlanCapture,
+        min_steps: Optional[int] = None,
+        max_steps: Optional[int] = None,
+    ) -> ValidationResult:
         """
         Validate a parsed plan.
-        
+
         Args:
             plan: The parsed plan to validate
-            min_steps: Minimum expected steps
-            max_steps: Maximum allowed steps
-            
+            min_steps: Minimum expected steps (defaults to config or 1)
+            max_steps: Maximum allowed steps (defaults to config or 20)
+
         Returns:
             ValidationResult with issues and score
         """
+        # Use config bounds if available, otherwise use defaults
+        if min_steps is None:
+            min_steps = self.config.step_bounds.min_steps if self.config else 1
+        if max_steps is None:
+            max_steps = self.config.step_bounds.max_steps if self.config else 20
         issues = []
         penalties = {}
         checks = []

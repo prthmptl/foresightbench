@@ -1,0 +1,63 @@
+{
+  "_comment": "Example evaluation configuration. Copy and modify as needed.",
+
+  "penalties": {
+    "step_count_mismatch": 0.1,
+    "skipped_step": 0.15,
+    "extra_step": 0.05,
+    "empty_step": 0.1,
+    "numbering_error": 0.05,
+    "parse_failure": 0.5
+  },
+
+  "semantic_weights": {
+    "step_match": 0.4,
+    "completeness": 0.3,
+    "constraint_fidelity": 0.2,
+    "step_purity": 0.1
+  },
+
+  "foresight_weights": {
+    "rule_validation": 0.3,
+    "semantic_evaluation": 0.7
+  },
+
+  "reliability_weights": {
+    "skip_avoidance": 0.5,
+    "step_match": 0.3,
+    "rule_compliance": 0.2
+  },
+
+  "planning_weights": {
+    "completeness": 0.5,
+    "rule_compliance": 0.5
+  },
+
+  "completeness_heuristic": {
+    "very_short_threshold": 10,
+    "short_threshold": 50,
+    "medium_threshold": 150,
+    "very_short_score": 0.3,
+    "short_score": 0.6,
+    "medium_score": 0.8,
+    "long_score": 1.0
+  },
+
+  "drift": {
+    "threshold": 0.1,
+    "rolling_window_size": 3
+  },
+
+  "pass_thresholds": {
+    "rule_validation": 0.5,
+    "semantic_evaluation": 0.7,
+    "foresight_score": 0.7
+  },
+
+  "step_bounds": {
+    "min_steps": 1,
+    "max_steps": 20
+  },
+
+  "late_step_bonus": 0.0
+}

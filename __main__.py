@@ -78,6 +78,10 @@ def cmd_compare(args):
                 provider = "openai"
             elif "claude" in spec.lower():
                 provider = "anthropic"
+            elif "llama" in spec.lower() or "mixtral" in spec.lower():
+                provider = "groq"
+            elif "/" in spec:  # OpenRouter uses org/model format
+                provider = "openrouter"
             else:
                 provider = "mock"
             model = spec
@@ -180,8 +184,8 @@ def main():
     # Run command
     run_parser = subparsers.add_parser("run", help="Run benchmark on a model")
     run_parser.add_argument("--model", "-m", required=True, help="Model name")
-    run_parser.add_argument("--provider", "-p", default="openai", 
-                           choices=["openai", "anthropic", "mock"],
+    run_parser.add_argument("--provider", "-p", default="openai",
+                           choices=["openai", "anthropic", "openrouter", "groq", "mock"],
                            help="Model provider")
     run_parser.add_argument("--api-key", help="API key (or use env var)")
     run_parser.add_argument("--max-tasks", type=int, default=10, help="Max tasks to run")

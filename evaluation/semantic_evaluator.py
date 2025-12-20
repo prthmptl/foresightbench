@@ -10,11 +10,14 @@ Evaluates:
 
 import re
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from enum import Enum
 
 from core.capture import PlanStep, ExecutionStep, PlanCapture, ExecutionCapture, align_plan_and_execution
 from core.llm_interface import LLMClient, GenerationConfig
+
+if TYPE_CHECKING:
+    from .config import EvaluationConfig
 
 
 class EvaluationMethod(str, Enum):
@@ -105,7 +108,7 @@ Return ONLY a number between 0.0 and 1.0, nothing else."""
 class SemanticEvaluator:
     """
     Performs semantic evaluation of plan-execution alignment.
-    
+
     Uses LLM-as-judge for deep understanding of step matching,
     with fallback to heuristic methods.
     """
@@ -114,19 +117,22 @@ class SemanticEvaluator:
         self,
         llm_client: Optional[LLMClient] = None,
         use_embeddings: bool = False,
-        config: Optional[GenerationConfig] = None,
+        generation_config: Optional[GenerationConfig] = None,
+        eval_config: Optional["EvaluationConfig"] = None,
     ):
         """
         Initialize the semantic evaluator.
-        
+
         Args:
             llm_client: LLM client for judge prompts (optional)
             use_embeddings: Whether to use embedding similarity
-            config: Generation config for LLM calls
+            generation_config: Generation config for LLM calls
+            eval_config: EvaluationConfig for centralized configuration
         """
         self.llm_client = llm_client
         self.use_embeddings = use_embeddings
-        self.config = config or GenerationConfig(temperature=0.0, max_tokens=50)
+        self.generation_config = generation_config or GenerationConfig(temperature=0.0, max_tokens=50)
+        self.eval_config = eval_config
 
     def _parse_score(self, text: str) -> float:
         """Parse a score from LLM output."""
@@ -150,8 +156,8 @@ class SemanticEvaluator:
             plan_step=plan_step,
             exec_step=exec_step,
         )
-        
-        result = self.llm_client.generate(prompt, config=self.config)
+
+        result = self.llm_client.generate(prompt, config=self.generation_config)
         return self._parse_score(result.text)
 
     def _evaluate_completeness_llm(self, plan_step: str, exec_step: str) -> float:
@@ -163,8 +169,8 @@ class SemanticEvaluator:
             plan_step=plan_step,
             exec_step=exec_step,
         )
-        
-        result = self.llm_client.generate(prompt, config=self.config)
+
+        result = self.llm_client.generate(prompt, config=self.generation_config)
         return self._parse_score(result.text)
 
     def _evaluate_purity_llm(self, full_plan: str, step_index: int, exec_step: str) -> float:
@@ -177,8 +183,8 @@ class SemanticEvaluator:
             step_index=step_index,
             exec_step=exec_step,
         )
-        
-        result = self.llm_client.generate(prompt, config=self.config)
+
+        result = self.llm_client.generate(prompt, config=self.generation_config)
         return self._parse_score(result.text)
 
     def _evaluate_step_match_heuristic(self, plan_step: str, exec_step: str) -> float:
@@ -203,16 +209,21 @@ class SemanticEvaluator:
         if not exec_step.strip():
             return 0.0
 
-        # Simple heuristic: longer outputs are more likely complete
         word_count = len(exec_step.split())
-        if word_count < 10:
-            return 0.3
-        elif word_count < 50:
-            return 0.6
-        elif word_count < 150:
-            return 0.8
+
+        # Use config thresholds if available, otherwise use defaults
+        if self.eval_config is not None:
+            return self.eval_config.completeness_heuristic.get_score(word_count)
         else:
-            return 1.0
+            # Legacy hardcoded behavior
+            if word_count < 10:
+                return 0.3
+            elif word_count < 50:
+                return 0.6
+            elif word_count < 150:
+                return 0.8
+            else:
+                return 1.0
 
     def _evaluate_constraint_fidelity(
         self,
@@ -271,12 +282,22 @@ class SemanticEvaluator:
             step_purity = 1.0
 
         # Calculate overall score (weighted average)
-        overall_score = (
-            step_match * 0.4 +
-            completeness * 0.3 +
-            constraint_fidelity * 0.2 +
-            step_purity * 0.1
-        )
+        if self.eval_config is not None:
+            weights = self.eval_config.semantic_weights
+            overall_score = (
+                step_match * weights.step_match +
+                completeness * weights.completeness +
+                constraint_fidelity * weights.constraint_fidelity +
+                step_purity * weights.step_purity
+            )
+        else:
+            # Legacy hardcoded weights
+            overall_score = (
+                step_match * 0.4 +
+                completeness * 0.3 +
+                constraint_fidelity * 0.2 +
+                step_purity * 0.1
+            )
 
         return StepEvaluation(
             step_index=plan_step.index,
@@ -360,13 +381,19 @@ class SemanticEvaluator:
         )
 
 
-def calculate_drift(degradation_curve: list[float]) -> dict:
+def calculate_drift(
+    degradation_curve: list[float],
+    drift_threshold: float = 0.1,
+    rolling_window_size: int = 3,
+) -> dict:
     """
     Calculate drift metrics from degradation curve.
-    
+
     Args:
         degradation_curve: List of scores by step index
-        
+        drift_threshold: Magnitude threshold for detecting drift (default: 0.1)
+        rolling_window_size: Window size for rolling average (default: 3)
+
     Returns:
         Dictionary with drift metrics
     """
@@ -386,22 +413,23 @@ def calculate_drift(degradation_curve: list[float]) -> dict:
 
     drift_magnitude = first_avg - second_avg
 
-    if drift_magnitude > 0.1:
+    # Classify trend based on threshold
+    if drift_magnitude > drift_threshold:
         trend = "declining"
-    elif drift_magnitude < -0.1:
+    elif drift_magnitude < -drift_threshold:
         trend = "improving"
     else:
         trend = "stable"
 
     # Rolling average
-    window_size = min(3, len(degradation_curve))
+    window_size = min(rolling_window_size, len(degradation_curve))
     rolling_avg = []
     for i in range(len(degradation_curve) - window_size + 1):
         window = degradation_curve[i:i + window_size]
         rolling_avg.append(sum(window) / len(window))
 
     return {
-        "drift_detected": abs(drift_magnitude) > 0.1,
+        "drift_detected": abs(drift_magnitude) > drift_threshold,
         "drift_magnitude": drift_magnitude,
         "trend": trend,
         "first_half_avg": first_avg,
