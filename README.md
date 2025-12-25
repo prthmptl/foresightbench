@@ -827,9 +827,9 @@ If you use ForesightBench in your research, please cite:
 ```bibtex
 @software{foresightbench2025,
   title = {ForesightBench: Evaluating LLM Plan-Execution Faithfulness},
-  author = {Patel, Pratham},
+  author = {Pratham, Patel},
   year = {2025},
-  url = {https://github.com/prthmptl/foresight-bench},
+  url = {https://github.com/prthmptl/foresightbench},
   version = {0.1.0}
 }
 ```
@@ -844,5 +844,5 @@ ForesightBench was developed to address the growing need for rigorous evaluation
 
 ## Contact
 
-- **Repository**: [github.com/prthmptl/foresight-bench](https://github.com/prthmptl/foresight-bench)
-- **Issues**: [GitHub Issues](https://github.com/prthmptl/foresight-bench/issues)
+- **Repository**: [github.com/prthmptl/foresightbench](https://github.com/prthmptl/foresightbench)
+- **Issues**: [GitHub Issues](https://github.com/prthmptl/foresightbench/issues)
